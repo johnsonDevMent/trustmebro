@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Link Expired{% endblock %}
+
+{% block content %}
+<div class="container centered-content">
+    <div class="expired-message">
+        <div class="expired-icon">⏰</div>
+        {% if reason == 'expired' %}
+        <h1>This Link Has Expired</h1>
+        <p>This share link expired on {{ expires_at.strftime('%B %d, %Y at %H:%M UTC') }}.</p>
+        <p class="expired-hint">Share links are valid for 48 hours. Ask the creator to share a new link.</p>
+        {% else %}
+        <h1>Link Not Found</h1>
+        <p>This share link doesn't exist or has been removed.</p>
+        {% endif %}
+        
+        <div class="expired-actions">
+            <a href="{{ url_for('index') }}" class="btn-vintage">Create Your Own Paper</a>
+            <a href="{{ url_for('gallery') }}" class="btn-text">Browse Gallery</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

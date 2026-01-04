@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Gallery - Browse Parody Research{% endblock %}
+
+{% block meta_title %}TRUSTMEBRO Gallery - Browse Hilarious Fake Research Papers{% endblock %}
+{% block meta_description %}Explore our collection of parody academic papers. Vote on the funniest fake research, discover absurd claims turned into "science", and share satirical studies.{% endblock %}
+{% block meta_keywords %}parody papers gallery, fake research collection, funny academic papers, satirical studies, TRUSTMEBRO gallery, best parody research{% endblock %}
+
+{% block og_title %}TRUSTMEBRO Gallery - Browse & Vote on Parody Research{% endblock %}
+{% block og_description %}Explore hilarious fake academic papers. Vote for your favorites and discover the most absurd "research" ever published.{% endblock %}
+
+{% block json_ld %}
+{
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "TRUSTMEBRO Gallery",
+    "description": "Collection of parody academic papers and satirical research",
+    "url": "{{ request.url }}",
+    "isPartOf": {
+        "@type": "WebSite",
+        "name": "TRUSTMEBRO"
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="container-wide">
+    <!-- Header -->
+    <div class="gallery-header">
+        <div>
+            <h1 style="font-size: 24px; margin-bottom: 4px;">Public Gallery</h1>
+            <p style="color: var(--text-secondary); font-size: 14px;">Browse and vote on unverified claims</p>
+        </div>
+        
+        <!-- Tabs & Filters -->
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <div class="gallery-tabs">
+                <a href="{{ url_for('gallery', tab='trending', voice=voice_filter, template=template_filter) }}" 
+                   class="gallery-tab {% if tab == 'trending' %}active{% endif %}">🔥 Trending</a>
+                <a href="{{ url_for('gallery', tab='new', voice=voice_filter, template=template_filter) }}" 
+                   class="gallery-tab {% if tab == 'new' %}active{% endif %}">✨ New</a>
+            </div>
+            
+            <div class="gallery-filters">
+                <select class="filter-select" onchange="applyFilter('voice', this.value)">
+                    <option value="all" {% if voice_filter == 'all' %}selected{% endif %}>All Voices</option>
+                    <option value="naija" {% if voice_filter == 'naija' %}selected{% endif %}>🇳🇬 Naija</option>
+                    <option value="global" {% if voice_filter == 'global' %}selected{% endif %}>🌐 Global</option>
+                </select>
+                <select class="filter-select" onchange="applyFilter('template', this.value)">
+                    <option value="all" {% if template_filter == 'all' %}selected{% endif %}>All Types</option>
+                    <option value="journal" {% if template_filter == 'journal' %}selected{% endif %}>📄 Journal</option>
+                    <option value="conference" {% if template_filter == 'conference' %}selected{% endif %}>🎓 Conference</option>
+                    <option value="thesis" {% if template_filter == 'thesis' %}selected{% endif %}>✨ Thesis</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid -->
+    {% if posts %}
+    <div class="gallery-grid">
+        {% for post in posts %}
+        <a href="{{ url_for('gallery_post', post_id=post.post_id) }}" class="gallery-card">
+            <div class="gallery-card-content">
+                <div class="gallery-badges">
+                    <span class="badge badge-template">{{ post.template }}</span>
+                    <span class="badge badge-voice">{% if post.voice == 'naija' %}🇳🇬{% else %}🌐{% endif %} {{ post.voice }}</span>
+                </div>
+                <h3 class="gallery-card-title">{{ post.title }}</h3>
+                <p class="gallery-card-excerpt">{{ post.abstract[:120] }}...</p>
+            </div>
+            <div class="gallery-card-footer">
+                <span class="gallery-card-meta">{{ post.created_at[:10] }}</span>
+                <span class="gallery-card-votes">
+                    {% if post.vote_count >= 0 %}↑{% else %}↓{% endif %} {{ post.vote_count }}
+                    {% if post.chart_count > 0 %} · 📊 {{ post.chart_count }}{% endif %}
+                </span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📚</div>
+        <h3>No papers yet</h3>
+        <p>Be the first to publish a parody paper!</p>
+        <a href="{{ url_for('index') }}" class="btn-primary" style="display: inline-flex; width: auto; padding: 12px 24px;">Generate Paper</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function applyFilter(type, value) {
+        const url = new URL(window.location);
+        url.searchParams.set(type, value);
+        window.location = url;
+    }
+</script>
+{% endblock %}

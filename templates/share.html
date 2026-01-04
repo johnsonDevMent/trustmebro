@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}{{ paper.title }} (Shared){% endblock %}
+
+{% block meta_title %}{{ paper.title }} - TRUSTMEBRO Parody Paper{% endblock %}
+{% block meta_description %}{{ paper.abstract[:160] }}... [PARODY - This is fictional satirical content]{% endblock %}
+{% block meta_keywords %}{{ paper.title }}, shared parody paper, TRUSTMEBRO, fake research, satire{% endblock %}
+
+{% block og_type %}article{% endblock %}
+{% block og_title %}{{ paper.title }}{% endblock %}
+{% block og_description %}{{ paper.abstract[:180] }}... [PARODY]{% endblock %}
+{% block og_image %}{{ url_for('download_image', paper_id=paper.paper_id, _external=True) }}{% endblock %}
+
+{% block twitter_title %}{{ paper.title[:60] }} [PARODY]{% endblock %}
+{% block twitter_description %}{{ paper.abstract[:150] }}... This is satirical fictional research from TRUSTMEBRO.{% endblock %}
+
+{% block json_ld %}
+{
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "{{ paper.title | e }}",
+    "description": "{{ paper.abstract[:200] | e }}... (Parody Content)",
+    "author": {
+        "@type": "Organization",
+        "name": "TRUSTMEBRO (Parody Generator)"
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "TRUSTMEBRO - Journal of Unverified Claims"
+    },
+    "genre": "Satire",
+    "isAccessibleForFree": true
+}
+{% endblock %}
+
+{% block content %}
+<div class="container paper-container">
+    <!-- Share Info Bar -->
+    <div class="share-info-bar">
+        <span class="share-info-icon">🔗</span>
+        <span class="share-info-text">Unlisted link — expires on {{ expires_at.strftime('%B %d, %Y at %H:%M UTC') }}</span>
+        <button class="btn-vintage-small" onclick="copyCurrentLink()">Copy Link</button>
+    </div>
+
+    <!-- Paper Content -->
+    <article class="paper">
+        <header class="paper-header">
+            <div class="paper-id">
+                <span class="paper-id-label">Study ID:</span>
+                <span class="paper-id-value">{{ paper.paper_id }}</span>
+                <span class="fictional-badge">FICTIONAL</span>
+            </div>
+            
+            <h1 class="paper-title">{{ paper.title }}</h1>
+            
+            <div class="paper-authors">
+                {% for author in paper.authors %}
+                    <span class="author">{{ author }}</span>{% if not loop.last %}, {% endif %}
+                {% endfor %}
+                <span class="fictional-badge">FICTIONAL AUTHORS</span>
+            </div>
+            
+            <div class="paper-affiliations">
+                {% for affiliation in paper.affiliations %}
+                    <span class="affiliation">{{ affiliation }}</span>{% if not loop.last %} | {% endif %}
+                {% endfor %}
+                <span class="fictional-badge">FICTIONAL INSTITUTIONS</span>
+            </div>
+        </header>
+
+        <div class="parody-notice">
+            <strong>⚠️ PARODY NOTICE:</strong> This document is entirely fictional and was generated for entertainment purposes only.
+        </div>
+
+        <section class="paper-section">
+            <h2 class="section-title">Abstract</h2>
+            <p class="abstract-text">{{ paper.abstract }}</p>
+        </section>
+
+        {% if paper.chart_files %}
+        <section class="paper-section charts-section">
+            {% for chart_file in paper.chart_files %}
+            <figure class="chart-figure">
+                <img src="{{ url_for('static', filename='charts/' + chart_file) }}" alt="Chart {{ loop.index }}" class="chart-image">
+                {% if paper.charts and loop.index0 < paper.charts|length %}
+                <figcaption class="chart-caption">{{ paper.charts[loop.index0].caption }}</figcaption>
+                {% endif %}
+            </figure>
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        {% if paper.introduction %}
+        <section class="paper-section">
+            <h2 class="section-title">1. Introduction</h2>
+            <div class="section-content">{{ paper.introduction|safe }}</div>
+        </section>
+        {% endif %}
+
+        {% if paper.methods %}
+        <section class="paper-section">
+            <h2 class="section-title">2. Methods</h2>
+            <div class="section-content">{{ paper.methods|replace('**', '')|safe }}</div>
+        </section>
+        {% endif %}
+
+        {% if paper.results %}
+        <section class="paper-section">
+            <h2 class="section-title">3. Results</h2>
+            <div class="section-content">{{ paper.results|replace('**', '')|safe }}</div>
+        </section>
+        {% endif %}
+
+        {% if paper.discussion %}
+        <section class="paper-section">
+            <h2 class="section-title">4. Discussion</h2>
+            <div class="section-content">{{ paper.discussion|replace('**', '')|safe }}</div>
+        </section>
+        {% endif %}
+
+        <section class="paper-section">
+            <h2 class="section-title">Limitations & Disclaimer</h2>
+            <div class="section-content limitations-content">{{ paper.limitations|replace('**', '')|safe }}</div>
+        </section>
+
+        <section class="paper-section">
+            <h2 class="section-title">References <span class="fictional-badge">ALL FICTIONAL</span></h2>
+            <ol class="references-list">
+                {% for ref in paper.references %}
+                <li class="reference-item">{{ ref }}</li>
+                {% endfor %}
+            </ol>
+        </section>
+    </article>
+
+    <!-- Create Your Own CTA -->
+    <div class="cta-section">
+        <p>Want to create your own parody paper?</p>
+        <a href="{{ url_for('index') }}" class="btn-stamp">Generate Your Own</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function copyCurrentLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            alert('Link copied!');
+        });
+    }
+</script>
+{% endblock %}

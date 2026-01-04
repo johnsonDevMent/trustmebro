@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Parody Paper{% endblock %}
+
+{% block meta_title %}TRUSTMEBRO - Free Parody Research Paper Generator{% endblock %}
+{% block meta_description %}Create hilarious fake academic papers instantly! Enter any ridiculous claim and get a professional-looking parody research paper with fake data, charts, and citations. Free satirical science generator.{% endblock %}
+{% block meta_keywords %}parody paper generator, fake research paper, satirical academic paper, humor science generator, fake study creator, TRUSTMEBRO, funny academic paper, mock research, spoof journal article{% endblock %}
+
+{% block og_title %}TRUSTMEBRO - Turn Any Ridiculous Claim Into "Research"{% endblock %}
+{% block og_description %}Generate hilarious fake academic papers for any claim. Complete with fake data, charts, and citations. The premier satirical journal of unverified claims.{% endblock %}
+
+{% block twitter_title %}TRUSTMEBRO - Fake Research Paper Generator 📊🎓{% endblock %}
+{% block twitter_description %}Turn any ridiculous claim into official-looking "research"! Free parody academic paper generator with fake data & charts.{% endblock %}
+
+{% block json_ld %}
+{
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "TRUSTMEBRO",
+    "alternateName": "Journal of Unverified Claims",
+    "description": "Parody research paper generator - create satirical academic papers from any claim",
+    "url": "{{ request.url }}",
+    "applicationCategory": "Entertainment",
+    "operatingSystem": "Web Browser",
+    "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+    },
+    "featureList": [
+        "Generate parody academic papers",
+        "Create fake research charts",
+        "Export to PDF",
+        "Share on social media"
+    ]
+}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Masthead -->
+    <div class="masthead">
+        <p class="masthead-eyebrow">Est. 2024 · Volume ∞ · Issue π</p>
+        <h1 class="masthead-title">TRUSTMEBRO</h1>
+        <p class="masthead-subtitle">Journal of Unverified Claims</p>
+        <p class="masthead-tagline">"If it sounds true enough, it probably is" — Nobody, Ever</p>
+    </div>
+
+    <!-- Main Form -->
+    <form action="{{ url_for('generate') }}" method="POST" class="form-card" id="claim-form">
+        <div class="form-header">
+            <span class="form-number">SUBMISSION FORM 104-B</span>
+        </div>
+
+        <!-- Claim Input -->
+        <div class="form-section">
+            <label for="claim" class="form-label">Your Claim</label>
+            <textarea 
+                id="claim" 
+                name="claim" 
+                class="form-textarea"
+                placeholder="State your unverified claim... (e.g., 'People who eat rice with spoon are 47% more organized')"
+                required
+                maxlength="500"
+            ></textarea>
+            <p class="form-hint">The more absurd, the better. We'll make it look official.</p>
+        </div>
+
+        <!-- Template Selection -->
+        <div class="form-section">
+            <label class="form-label">Publication Type</label>
+            <div class="selection-grid">
+                <label class="selection-card">
+                    <input type="radio" name="template" value="journal" checked>
+                    <span class="selection-card-content">
+                        <span class="selection-icon">📄</span>
+                        <span class="selection-title">Journal</span>
+                        <span class="selection-desc">Peer-reviewed parody</span>
+                    </span>
+                </label>
+                <label class="selection-card">
+                    <input type="radio" name="template" value="conference">
+                    <span class="selection-card-content">
+                        <span class="selection-icon">🎓</span>
+                        <span class="selection-title">Conference</span>
+                        <span class="selection-desc">Presented at nowhere</span>
+                    </span>
+                </label>
+                <label class="selection-card">
+                    <input type="radio" name="template" value="thesis">
+                    <span class="selection-card-content">
+                        <span class="selection-icon">✨</span>
+                        <span class="selection-title">Thesis</span>
+                        <span class="selection-desc">Faculty of Parody</span>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Paper Length -->
+        <div class="form-section">
+            <label class="form-label">Paper Length</label>
+            <div class="pill-group">
+                <label class="pill-option">
+                    <input type="radio" name="length" value="abstract" checked>
+                    <span class="pill-label">Abstract Only <span class="pill-badge">Free</span></span>
+                </label>
+                <label class="pill-option">
+                    <input type="radio" name="length" value="short">
+                    <span class="pill-label">Short Paper <span class="pill-badge">API</span></span>
+                </label>
+                <label class="pill-option">
+                    <input type="radio" name="length" value="full">
+                    <span class="pill-label">Full Paper <span class="pill-badge">API</span></span>
+                </label>
+            </div>
+            <p class="form-hint" id="api-hint" style="display: none;">⚡ Requires Groq API key</p>
+        </div>
+
+        <!-- Voice & Tone Row -->
+        <div class="form-row">
+            <div class="form-section">
+                <label class="form-label">Voice Mode</label>
+                <div class="pill-group">
+                    <label class="pill-option">
+                        <input type="radio" name="voice" value="naija" checked>
+                        <span class="pill-label">🇳🇬 Naija</span>
+                    </label>
+                    <label class="pill-option">
+                        <input type="radio" name="voice" value="global">
+                        <span class="pill-label">🌐 Global</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-section">
+                <label class="form-label">Academic Tone</label>
+                <div class="pill-group">
+                    <label class="pill-option">
+                        <input type="radio" name="tone" value="deadpan" checked>
+                        <span class="pill-label">🎓 Deadpan</span>
+                    </label>
+                    <label class="pill-option">
+                        <input type="radio" name="tone" value="comedic">
+                        <span class="pill-label">😄 Comedic</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Count -->
+        <div class="form-section">
+            <label class="form-label">Charts to Generate</label>
+            <div class="slider-wrapper">
+                <input type="range" name="chart_count" id="chart_count" min="1" max="3" value="1" class="slider">
+                <span class="slider-value" id="chart_value">1</span>
+            </div>
+            <p class="form-hint">More charts = more credibility (in parody terms)</p>
+        </div>
+
+        <!-- Lock Seed -->
+        <div class="form-section">
+            <label class="checkbox-wrapper">
+                <input type="checkbox" name="lock_seed" id="lock_seed">
+                <span class="checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </span>
+                <span class="checkbox-content">
+                    <span class="checkbox-title">🔒 Lock Seed</span>
+                    <span class="checkbox-desc">Reproducible output — same claim = same paper every time</span>
+                </span>
+            </label>
+        </div>
+
+        <!-- API Key Section -->
+        <div class="form-section">
+            <div class="api-section">
+                <span class="api-status">
+                    <span class="api-indicator {% if groq_key_set %}active{% endif %}"></span>
+                    <span>Groq API Key: {% if groq_key_set %}Connected{% else %}Not set{% endif %}</span>
+                </span>
+                <button type="button" class="btn-link" onclick="toggleGroqModal()">
+                    {% if groq_key_set %}Change{% else %}Add Key{% endif %}
+                </button>
+            </div>
+        </div>
+
+        <!-- Hidden Groq Key -->
+        <input type="hidden" name="groq_key" id="groq_key_hidden" value="">
+
+        <!-- Submit -->
+        <div class="form-submit">
+            <button type="submit" class="btn-primary" id="submit-btn">
+                <span>✨</span>
+                <span>Generate Parody Paper</span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Groq Modal -->
+<div class="modal-overlay" id="groq-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Add Groq API Key</h3>
+            <button class="modal-close" onclick="toggleGroqModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p>Enter your API key to generate Short and Full papers with AI-enhanced content.</p>
+            <input type="password" id="groq_key_input" class="form-input" placeholder="gsk_...">
+            <p class="form-hint">Stored in your session only. Never logged.</p>
+            <details>
+                <summary>Why do I need this?</summary>
+                <p>Abstract papers work without a key. Short and Full papers use Groq's AI for more detailed content. Get a free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a></p>
+            </details>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="toggleGroqModal()">Cancel</button>
+            <button class="btn-modal-primary" onclick="saveGroqKey()">Save Key</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Length selection hint
+    document.querySelectorAll('input[name="length"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('api-hint').style.display = 
+                this.value !== 'abstract' ? 'block' : 'none';
+        });
+    });
+
+    // Chart slider
+    const slider = document.getElementById('chart_count');
+    const sliderValue = document.getElementById('chart_value');
+    slider.addEventListener('input', function() {
+        sliderValue.textContent = this.value;
+    });
+
+    // Modal
+    function toggleGroqModal() {
+        document.getElementById('groq-modal').classList.toggle('active');
+    }
+
+    function saveGroqKey() {
+        const key = document.getElementById('groq_key_input').value.trim();
+        if (key) {
+            document.getElementById('groq_key_hidden').value = key;
+            document.querySelector('.api-indicator').classList.add('active');
+            document.querySelector('.api-status span:last-child').textContent = 'Groq API Key: Connected';
+            
+            fetch('/save_groq_key', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'groq_key=' + encodeURIComponent(key)
+            });
+        }
+        toggleGroqModal();
+    }
+
+    // Form submission
+    document.getElementById('claim-form').addEventListener('submit', function() {
+        const btn = document.getElementById('submit-btn');
+        btn.innerHTML = '<span>⏳</span><span>Fabricating Evidence...</span>';
+        btn.disabled = true;
+    });
+
+    // Close modal on escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.getElementById('groq-modal').classList.remove('active');
+        }
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('groq-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.remove('active');
+        }
+    });
+</script>
+{% endblock %}

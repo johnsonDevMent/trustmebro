@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block meta_title %}{{ post.title }} - TRUSTMEBRO Parody Research{% endblock %}
+{% block meta_description %}{{ post.abstract[:160] }}...{% endblock %}
+{% block meta_keywords %}{{ post.title }}, parody research, fake academic paper, TRUSTMEBRO, satirical study, {{ post.voice }} style{% endblock %}
+
+{% block og_type %}article{% endblock %}
+{% block og_title %}{{ post.title }}{% endblock %}
+{% block og_description %}{{ post.abstract[:200] }}...{% endblock %}
+{% block og_image %}{{ url_for('download_image', paper_id=post.paper_id, _external=True) }}{% endblock %}
+
+{% block twitter_title %}{{ post.title[:60] }}...{% endblock %}
+{% block twitter_description %}{{ post.abstract[:180] }}...{% endblock %}
+{% block twitter_image %}{{ url_for('download_image', paper_id=post.paper_id, _external=True) }}{% endblock %}
+
+{% block json_ld %}
+{
+    "@context": "https://schema.org",
+    "@type": "ScholarlyArticle",
+    "headline": "{{ post.title | e }}",
+    "description": "{{ post.abstract[:200] | e }}...",
+    "datePublished": "{{ post.created_at }}",
+    "dateModified": "{{ post.updated_at or post.created_at }}",
+    "author": {
+        "@type": "Organization",
+        "name": "TRUSTMEBRO (Parody)"
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "TRUSTMEBRO - Journal of Unverified Claims",
+        "logo": {
+            "@type": "ImageObject",
+            "url": "{{ url_for('static', filename='og-image.png', _external=True) }}"
+        }
+    },
+    "image": "{{ url_for('download_image', paper_id=post.paper_id, _external=True) }}",
+    "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "{{ request.url }}"
+    },
+    "genre": "Parody/Satire",
+    "isAccessibleForFree": true,
+    "keywords": "parody, satire, fake research, humor"
+}
+{% endblock %}
+
+{% block content %}
+<div class="paper-container">
+    <!-- Actions Bar -->
+    <div class="paper-actions" style="justify-content: space-between;">
+        <a href="{{ url_for('gallery') }}" class="btn-action">← Back to Gallery</a>
+        
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <!-- Voting -->
+            <div class="vote-buttons">
+                <button class="vote-btn upvote {% if user_vote == 1 %}active{% endif %}" onclick="vote(1)" title="Upvote">↑</button>
+                <span class="vote-count" id="vote-count">{{ post.vote_count }}</span>
+                <button class="vote-btn downvote {% if user_vote == -1 %}active{% endif %}" onclick="vote(-1)" title="Downvote">↓</button>
+            </div>
+            
+            <button class="btn-action" onclick="copyLink()">📤 Share</button>
+            <a href="{{ url_for('download_image', paper_id=post.paper_id) }}" class="btn-action">🖼️ Image</a>
+            <button class="btn-action" onclick="showReportModal()" style="color: var(--error);">🚩 Report</button>
+        </div>
+    </div>
+
+    <!-- Post Meta -->
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+        <span>Posted by <strong>{{ post.author_name }}</strong></span>
+        <span>•</span>
+        <span>{{ post.created_at[:10] }}</span>
+        <span>•</span>
+        <span class="badge badge-template">{{ post.template }}</span>
+        <span class="badge badge-voice">{% if post.voice == 'naija' %}🇳🇬{% else %}🌐{% endif %} {{ post.voice }}</span>
+    </div>
+
+    {% if post.is_hidden %}
+    <div style="padding: 12px 16px; background: #FFF3E0; border-left: 3px solid #FF9800; border-radius: 4px; margin-bottom: 20px; font-size: 13px; color: #E65100;">
+        ⚠️ This post is currently hidden pending review.
+    </div>
+    {% endif %}
+
+    <!-- Paper Card -->
+    <div class="paper-card" id="paper-content">
+        <div class="paper-header">
+            <span class="paper-study-id">Study ID: {{ post.paper_id }} <span class="fictional-tag">Fictional</span></span>
+            <h1 class="paper-title">{{ post.title }}</h1>
+            <p class="paper-authors">
+                {{ post.authors|join(', ') }}
+                <span class="fictional-tag">Fictional Authors</span>
+            </p>
+            <p class="paper-affiliations">
+                {{ post.affiliations|join(' | ') }}
+                <span class="fictional-tag">Fictional Institutions</span>
+            </p>
+        </div>
+
+        <div class="parody-notice">
+            <strong>⚠️ PARODY NOTICE:</strong> This document is entirely fictional and was generated for entertainment purposes only.
+        </div>
+
+        <div class="paper-content">
+            <div class="paper-section">
+                <h2 class="paper-section-title">Abstract</h2>
+                <p>{{ post.abstract }}</p>
+            </div>
+
+            {% if post.chart_files %}
+            {% for chart_file in post.chart_files %}
+            <div class="paper-chart">
+                <img src="{{ url_for('static', filename='charts/' + chart_file) }}" alt="Chart {{ loop.index }}" style="max-width: 100%; height: auto;">
+                {% if post.charts and loop.index0 < post.charts|length %}
+                <p class="paper-chart-caption">{{ post.charts[loop.index0].caption }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if post.introduction %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">1. Introduction</h2>
+                <p>{{ post.introduction|safe }}</p>
+            </div>
+            {% endif %}
+
+            {% if post.methods %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">2. Methods</h2>
+                <p>{{ post.methods|replace('**', '')|safe }}</p>
+            </div>
+            {% endif %}
+
+            {% if post.results %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">3. Results</h2>
+                <p>{{ post.results|replace('**', '')|safe }}</p>
+            </div>
+            {% endif %}
+
+            {% if post.discussion %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">4. Discussion</h2>
+                <p>{{ post.discussion|replace('**', '')|safe }}</p>
+            </div>
+            {% endif %}
+
+            <div class="paper-section">
+                <h2 class="paper-section-title">Limitations & Disclaimer</h2>
+                <p>{{ post.limitations|replace('**', '')|safe }}</p>
+            </div>
+        </div>
+
+        <div class="paper-references">
+            <h3>References <span class="fictional-tag">All Fictional</span></h3>
+            <ol class="reference-list">
+                {% for ref in post.references %}
+                <li>{{ ref }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+</div>
+
+<!-- Report Modal -->
+<div class="modal-overlay" id="report-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Report Content</h3>
+            <button class="modal-close" onclick="hideReportModal()">×</button>
+        </div>
+        <form action="{{ url_for('report', post_id=post.post_id) }}" method="POST">
+            <div class="modal-body">
+                <p>Why are you reporting this content?</p>
+                <div class="report-reasons">
+                    <label class="report-reason">
+                        <input type="radio" name="reason" value="harmful" required>
+                        <span>Harmful or dangerous content</span>
+                    </label>
+                    <label class="report-reason">
+                        <input type="radio" name="reason" value="hate">
+                        <span>Hate speech or discrimination</span>
+                    </label>
+                    <label class="report-reason">
+                        <input type="radio" name="reason" value="impersonation">
+                        <span>Real person/institution impersonation</span>
+                    </label>
+                    <label class="report-reason">
+                        <input type="radio" name="reason" value="spam">
+                        <span>Spam or low quality</span>
+                    </label>
+                    <label class="report-reason">
+                        <input type="radio" name="reason" value="other">
+                        <span>Other</span>
+                    </label>
+                </div>
+                <textarea name="notes" class="report-notes" placeholder="Additional details (optional)"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="hideReportModal()">Cancel</button>
+                <button type="submit" class="btn-modal-primary" style="background: var(--error);">Submit Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const postId = "{{ post.post_id }}";
+    
+    function vote(value) {
+        {% if not current_user %}
+        window.location = "{{ url_for('auth', next=request.url) }}";
+        return;
+        {% endif %}
+        
+        fetch('/vote/' + postId, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'vote=' + value
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            document.getElementById('vote-count').textContent = data.vote_count;
+            document.querySelectorAll('.vote-btn').forEach(btn => btn.classList.remove('active'));
+            if (data.user_vote === 1) document.querySelector('.upvote').classList.add('active');
+            else if (data.user_vote === -1) document.querySelector('.downvote').classList.add('active');
+        });
+    }
+    
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href);
+    }
+    
+    function showReportModal() {
+        document.getElementById('report-modal').classList.add('active');
+    }
+    
+    function hideReportModal() {
+        document.getElementById('report-modal').classList.remove('active');
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') hideReportModal();
+    });
+
+    document.getElementById('report-modal').addEventListener('click', function(e) {
+        if (e.target === this) hideReportModal();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Setup{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>🔐 Admin Setup</h1>
+            <p>First-time admin configuration</p>
+        </div>
+        
+        <form method="POST" action="{{ url_for('setup_admin') }}">
+            <div class="form-section">
+                <label class="form-label">Setup Token</label>
+                <input type="password" name="token" class="form-input" 
+                       placeholder="Enter the admin setup token" required>
+                <p class="form-hint">Default: trustmebro-setup-2024 (change via TRUSTMEBRO_ADMIN_TOKEN env var)</p>
+            </div>
+            
+            <div class="form-section">
+                <label class="form-label">Username to Make Admin</label>
+                <input type="text" name="username" class="form-input" 
+                       placeholder="Enter existing username" required>
+                <p class="form-hint">This user must already have an account</p>
+            </div>
+            
+            <button type="submit" class="btn-primary" style="width: 100%;">
+                Create Admin
+            </button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="{{ url_for('auth') }}">Sign up first</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

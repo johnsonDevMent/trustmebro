@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="admin-title">Admin Dashboard</h1>
+
+    <!-- Tabs -->
+    <div class="admin-tabs">
+        <button class="admin-tab active" onclick="showAdminTab('reports')">
+            Pending Reports ({{ reports|length }})
+        </button>
+        <button class="admin-tab" onclick="showAdminTab('hidden')">
+            Hidden Posts ({{ hidden|length }})
+        </button>
+        <button class="admin-tab" onclick="showAdminTab('keywords')">
+            Blocked Keywords
+        </button>
+    </div>
+
+    <!-- Reports Tab -->
+    <div id="reports-tab" class="admin-tab-content">
+        <h2>Pending Reports</h2>
+        {% if reports %}
+        <div class="reports-list">
+            {% for report in reports %}
+            <div class="report-card">
+                <div class="report-header">
+                    <span class="report-reason">{{ report.reason }}</span>
+                    <span class="report-date">{{ report.created_at[:16] }}</span>
+                </div>
+                <div class="report-content">
+                    <p><strong>Paper:</strong> {{ report.title }}</p>
+                    <p><strong>Claim:</strong> {{ report.claim[:100] }}...</p>
+                    <p><strong>Reporter:</strong> {{ report.reporter_name or 'Anonymous' }}</p>
+                    {% if report.notes %}
+                    <p><strong>Notes:</strong> {{ report.notes }}</p>
+                    {% endif %}
+                </div>
+                <div class="report-actions">
+                    <a href="{{ url_for('gallery_post', post_id=report.post_id) }}" target="_blank" class="btn-text">View Post</a>
+                    <form action="{{ url_for('admin_action') }}" method="POST" class="inline-form">
+                        <input type="hidden" name="target_type" value="post">
+                        <input type="hidden" name="target_id" value="{{ report.post_id }}">
+                        <button type="submit" name="action" value="approve" class="btn-vintage-small">✓ Approve</button>
+                        <button type="submit" name="action" value="keep_hidden" class="btn-vintage-small">⊘ Keep Hidden</button>
+                        <button type="submit" name="action" value="remove" class="btn-vintage-small btn-danger">✗ Remove</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No pending reports! 🎉</p>
+        {% endif %}
+    </div>
+
+    <!-- Hidden Posts Tab -->
+    <div id="hidden-tab" class="admin-tab-content" style="display: none;">
+        <h2>Hidden Posts</h2>
+        {% if hidden %}
+        <div class="reports-list">
+            {% for post in hidden %}
+            <div class="report-card">
+                <div class="report-content">
+                    <p><strong>Paper:</strong> {{ post.title }}</p>
+                    <p><strong>Claim:</strong> {{ post.claim[:100] }}...</p>
+                </div>
+                <div class="report-actions">
+                    <a href="{{ url_for('gallery_post', post_id=post.post_id) }}" target="_blank" class="btn-text">View Post</a>
+                    <form action="{{ url_for('admin_action') }}" method="POST" class="inline-form">
+                        <input type="hidden" name="target_type" value="post">
+                        <input type="hidden" name="target_id" value="{{ post.post_id }}">
+                        <button type="submit" name="action" value="approve" class="btn-vintage-small">✓ Unhide</button>
+                        <button type="submit" name="action" value="remove" class="btn-vintage-small btn-danger">✗ Remove</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No hidden posts.</p>
+        {% endif %}
+    </div>
+
+    <!-- Keywords Tab -->
+    <div id="keywords-tab" class="admin-tab-content" style="display: none;">
+        <h2>Blocked Keywords</h2>
+        
+        <!-- Add Keyword Form -->
+        <form action="{{ url_for('admin_action') }}" method="POST" class="add-keyword-form">
+            <input type="hidden" name="target_type" value="keyword">
+            <input type="hidden" name="action" value="add_keyword">
+            <input type="text" name="keyword" class="form-input" placeholder="New keyword to block" required>
+            <button type="submit" class="btn-vintage-small">+ Add</button>
+        </form>
+
+        <div class="keywords-list">
+            {% for kw in keywords %}
+            <div class="keyword-item">
+                <span class="keyword-text">{{ kw.keyword }}</span>
+                <form action="{{ url_for('admin_action') }}" method="POST" class="inline-form">
+                    <input type="hidden" name="target_type" value="keyword">
+                    <input type="hidden" name="target_id" value="{{ kw.id }}">
+                    <button type="submit" name="action" value="remove_keyword" class="btn-text btn-danger">×</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function showAdminTab(tab) {
+        // Hide all tabs
+        document.querySelectorAll('.admin-tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        
+        // Show selected tab
+        document.getElementById(tab + '-tab').style.display = 'block';
+        event.target.classList.add('active');
+    }
+</script>
+{% endblock %}

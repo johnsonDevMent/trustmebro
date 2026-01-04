@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Login / Sign Up{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Welcome</h1>
+            <p>Sign in to publish papers and vote</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="showTab('login')">Login</button>
+            <button class="auth-tab" onclick="showTab('signup')">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" action="{{ url_for('login') }}" method="POST" class="auth-form">
+            <input type="hidden" name="next" value="{{ next_url }}">
+            
+            <div class="form-section">
+                <label for="login-username" class="form-label">Username</label>
+                <input type="text" id="login-username" name="username" class="form-input" required>
+            </div>
+            
+            <div class="form-section">
+                <label for="login-password" class="form-label">Password</label>
+                <input type="password" id="login-password" name="password" class="form-input" required>
+            </div>
+            
+            <button type="submit" class="btn-primary">Login</button>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signup-form" action="{{ url_for('signup') }}" method="POST" class="auth-form" style="display: none;">
+            <input type="hidden" name="next" value="{{ next_url }}">
+            
+            <div class="form-section">
+                <label for="signup-username" class="form-label">Username</label>
+                <input type="text" id="signup-username" name="username" class="form-input" 
+                       pattern="[a-zA-Z0-9_]+" minlength="3" maxlength="20" required>
+                <p class="form-hint">3-20 characters, letters/numbers/underscores</p>
+            </div>
+            
+            <div class="form-section">
+                <label for="signup-password" class="form-label">Password</label>
+                <input type="password" id="signup-password" name="password" class="form-input" 
+                       minlength="6" required>
+                <p class="form-hint">At least 6 characters</p>
+            </div>
+            
+            <div class="form-section">
+                <label for="signup-confirm" class="form-label">Confirm Password</label>
+                <input type="password" id="signup-confirm" name="confirm" class="form-input" required>
+            </div>
+            
+            <button type="submit" class="btn-primary">Create Account</button>
+        </form>
+
+        <div class="auth-footer">
+            By signing up, you agree to use this for parody only.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function showTab(tab) {
+        // Update tabs
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        // Show/hide forms
+        document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+        document.getElementById('signup-form').style.display = tab === 'signup' ? 'block' : 'none';
+    }
+</script>
+{% endblock %}

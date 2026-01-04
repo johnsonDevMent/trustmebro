@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}{{ paper.title }}{% endblock %}
+
+{% block meta_title %}{{ paper.title }} - TRUSTMEBRO{% endblock %}
+{% block meta_description %}{{ paper.abstract[:160] }}...{% endblock %}
+{% block meta_keywords %}{{ paper.title }}, parody paper, TRUSTMEBRO, fake research{% endblock %}
+
+{% block og_type %}article{% endblock %}
+{% block og_title %}{{ paper.title }}{% endblock %}
+{% block og_description %}{{ paper.abstract[:200] }}...{% endblock %}
+{% block og_image %}{{ url_for('download_image', paper_id=paper.paper_id, _external=True) }}{% endblock %}
+
+{% block content %}
+<div class="paper-container">
+    <!-- Actions -->
+    <div class="paper-actions">
+        <a href="{{ url_for('index') }}" class="btn-action">← New Paper</a>
+        <button class="btn-action" onclick="createShareLink()">📤 Share</button>
+        <a href="{{ url_for('download_image', paper_id=paper.paper_id) }}" class="btn-action">🖼️ Image</a>
+        <a href="{{ url_for('download_pdf', paper_id=paper.paper_id) }}" class="btn-action">📥 PDF</a>
+        {% if current_user and not gallery_post %}
+            <button class="btn-action primary" onclick="showPublishModal()">🌐 Publish</button>
+        {% elif gallery_post %}
+            <a href="{{ url_for('gallery_post', post_id=gallery_post.post_id) }}" class="btn-action">View in Gallery →</a>
+        {% endif %}
+    </div>
+
+    <!-- Share Result -->
+    <div class="share-result" id="share-result" style="display: none;">
+        <input type="text" id="share-url" readonly placeholder="Share link will appear here">
+        <button onclick="copyShareLink()">Copy</button>
+    </div>
+
+    <!-- Paper Card -->
+    <div class="paper-card">
+        <!-- Header -->
+        <div class="paper-header">
+            <span class="paper-study-id">Study ID: {{ paper.paper_id }} <span class="fictional-tag">Fictional</span></span>
+            <h1 class="paper-title">{{ paper.title }}</h1>
+            <p class="paper-authors">
+                {{ paper.authors|join(', ') }}
+                <span class="fictional-tag">Fictional Authors</span>
+            </p>
+            <p class="paper-affiliations">
+                {{ paper.affiliations|join(' | ') }}
+                <span class="fictional-tag">Fictional Institutions</span>
+            </p>
+        </div>
+
+        <!-- Parody Notice -->
+        <div class="parody-notice">
+            <strong>⚠️ PARODY NOTICE:</strong> This document is entirely fictional and was generated for entertainment purposes only. All data, findings, authors, and institutions are fabricated. DO NOT cite this document.
+        </div>
+
+        <!-- Content -->
+        <div class="paper-content">
+            <!-- Abstract -->
+            <div class="paper-section">
+                <h2 class="paper-section-title">Abstract</h2>
+                <p>{{ paper.abstract }}</p>
+            </div>
+
+            <!-- Charts -->
+            {% if paper.chart_files %}
+            {% for chart_file in paper.chart_files %}
+            <div class="paper-chart">
+                <img src="{{ url_for('static', filename='charts/' + chart_file) }}" alt="Chart {{ loop.index }}">
+                {% if paper.charts and loop.index0 < paper.charts|length %}
+                <p class="paper-chart-caption">{{ paper.charts[loop.index0].caption }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if paper.introduction %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">1. Introduction</h2>
+                <p>{{ paper.introduction|safe }}</p>
+            </div>
+            {% endif %}
+
+            {% if paper.methods %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">2. Methods</h2>
+                <p>{{ paper.methods|replace('**', '')|safe }}</p>
+            </div>
+            {% endif %}
+
+            {% if paper.results %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">3. Results</h2>
+                <p>{{ paper.results|replace('**', '')|safe }}</p>
+            </div>
+            {% endif %}
+
+            {% if paper.discussion %}
+            <div class="paper-section">
+                <h2 class="paper-section-title">4. Discussion</h2>
+                <p>{{ paper.discussion|replace('**', '')|safe }}</p>
+            </div>
+            {% endif %}
+
+            <div class="paper-section">
+                <h2 class="paper-section-title">Limitations & Disclaimer</h2>
+                <p>{{ paper.limitations|replace('**', '')|safe }}</p>
+            </div>
+        </div>
+
+        <!-- References -->
+        <div class="paper-references">
+            <h3>References <span class="fictional-tag">All Fictional</span></h3>
+            <ol class="reference-list">
+                {% for ref in paper.references %}
+                <li>{{ ref }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Copy Citation -->
+    <div class="text-center mt-16">
+        <button class="btn-action" onclick="copyCitation()">📋 Copy Citation</button>
+    </div>
+</div>
+
+<!-- Publish Modal -->
+<div class="modal-overlay" id="publish-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Publish to Gallery</h3>
+            <button class="modal-close" onclick="hidePublishModal()">×</button>
+        </div>
+        <form action="{{ url_for('publish', paper_id=paper.paper_id) }}" method="POST">
+            <div class="modal-body">
+                <p>Your paper will be visible in the public gallery where others can view and vote on it.</p>
+                <label class="checkbox-wrapper" style="margin-top: 16px; cursor: pointer;">
+                    <input type="checkbox" name="agree_policy" required>
+                    <span class="checkbox-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </span>
+                    <span class="checkbox-content">
+                        <span class="checkbox-title">I agree to the parody policy</span>
+                        <span class="checkbox-desc">This is for entertainment only, not harmful purposes</span>
+                    </span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="hidePublishModal()">Cancel</button>
+                <button type="submit" class="btn-modal-primary">Publish</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const paperId = "{{ paper.paper_id }}";
+    const paperTitle = "{{ paper.title|e }}";
+    const paperAuthors = "{{ paper.authors|join(', ')|e }}";
+    
+    function createShareLink() {
+        fetch('/create_share/' + paperId, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.url) {
+                    document.getElementById('share-url').value = data.url;
+                    document.getElementById('share-result').style.display = 'flex';
+                }
+            });
+    }
+    
+    function copyShareLink() {
+        const url = document.getElementById('share-url');
+        url.select();
+        navigator.clipboard.writeText(url.value);
+    }
+    
+    function copyCitation() {
+        const citation = `Fictional parody: ${paperAuthors}. "${paperTitle}" TRUSTMEBRO. [FICTIONAL - DO NOT CITE]`;
+        navigator.clipboard.writeText(citation);
+    }
+    
+    function showPublishModal() {
+        document.getElementById('publish-modal').classList.add('active');
+    }
+    
+    function hidePublishModal() {
+        document.getElementById('publish-modal').classList.remove('active');
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') hidePublishModal();
+    });
+
+    document.getElementById('publish-modal').addEventListener('click', function(e) {
+        if (e.target === this) hidePublishModal();
+    });
+</script>
+{% endblock %}
