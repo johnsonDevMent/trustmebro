@@ -16,12 +16,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from urllib.parse import urlparse
 
 # Try to import PostgreSQL driver
+PSYCOPG2_AVAILABLE = False
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
     PSYCOPG2_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     PSYCOPG2_AVAILABLE = False
+    # Only print warning if DATABASE_URL is actually set (to avoid noise)
+    if os.environ.get('DATABASE_URL'):
+        print(f"⚠️  psycopg2-binary not available: {e}")
+        print("   Falling back to SQLite. Install psycopg2-binary to use PostgreSQL.")
 
 from paper_generator import PaperGenerator
 from chart_generator import ChartGenerator
@@ -37,8 +42,8 @@ def create_app():
     
     # Database configuration - support both SQLite and PostgreSQL
     database_url = os.environ.get('DATABASE_URL')
-    if database_url:
-        # PostgreSQL via DATABASE_URL
+    if database_url and PSYCOPG2_AVAILABLE:
+        # PostgreSQL via DATABASE_URL (only if psycopg2 is available)
         app.config['DATABASE_URL'] = database_url
         app.config['DATABASE_TYPE'] = 'postgresql'
         # Parse DATABASE_URL to extract connection info
@@ -50,6 +55,15 @@ def create_app():
         app.config['DB_PASSWORD'] = parsed.password
     else:
         # SQLite fallback
+        if database_url and not PSYCOPG2_AVAILABLE:
+            # DATABASE_URL is set but psycopg2 is not available - warn and use SQLite
+            import warnings
+            warnings.warn(
+                "DATABASE_URL is set but psycopg2-binary is not installed. "
+                "Falling back to SQLite. Install psycopg2-binary to use PostgreSQL.",
+                RuntimeWarning
+            )
+            print("⚠️  WARNING: DATABASE_URL detected but psycopg2-binary not available. Using SQLite instead.")
         app.config['DATABASE'] = os.path.join(app.instance_path, 'trustmebro.db')
         app.config['DATABASE_TYPE'] = 'sqlite'
     
@@ -167,19 +181,25 @@ def get_db():
         db_type = current_app.config.get('DATABASE_TYPE', 'sqlite')
         
         if db_type == 'postgresql':
+            # This should never happen if create_app() worked correctly, but double-check
             if not PSYCOPG2_AVAILABLE:
-                raise RuntimeError("PostgreSQL support requires psycopg2-binary. Install it with: pip install psycopg2-binary")
-            
-            # PostgreSQL connection
-            raw_conn = psycopg2.connect(
-                host=current_app.config['DB_HOST'],
-                port=current_app.config['DB_PORT'],
-                database=current_app.config['DB_NAME'],
-                user=current_app.config['DB_USER'],
-                password=current_app.config['DB_PASSWORD']
-            )
-            raw_conn.autocommit = False
-            g.db = DatabaseWrapper(raw_conn, 'postgresql')
+                # Fallback to SQLite if PostgreSQL driver is not available
+                print("⚠️  ERROR: PostgreSQL requested but psycopg2-binary not available. Falling back to SQLite.")
+                current_app.config['DATABASE_TYPE'] = 'sqlite'
+                current_app.config['DATABASE'] = os.path.join(current_app.instance_path, 'trustmebro.db')
+                raw_conn = sqlite3.connect(current_app.config['DATABASE'])
+                g.db = DatabaseWrapper(raw_conn, 'sqlite')
+            else:
+                # PostgreSQL connection
+                raw_conn = psycopg2.connect(
+                    host=current_app.config['DB_HOST'],
+                    port=current_app.config['DB_PORT'],
+                    database=current_app.config['DB_NAME'],
+                    user=current_app.config['DB_USER'],
+                    password=current_app.config['DB_PASSWORD']
+                )
+                raw_conn.autocommit = False
+                g.db = DatabaseWrapper(raw_conn, 'postgresql')
         else:
             # SQLite connection
             raw_conn = sqlite3.connect(current_app.config['DATABASE'])
@@ -198,8 +218,14 @@ def init_db(app):
     
     if db_type == 'postgresql':
         if not PSYCOPG2_AVAILABLE:
-            raise RuntimeError("PostgreSQL support requires psycopg2-binary. Install it with: pip install psycopg2-binary")
-        
+            # Fallback to SQLite if PostgreSQL driver is not available
+            print("⚠️  WARNING: PostgreSQL requested but psycopg2-binary not available. Using SQLite instead.")
+            db_type = 'sqlite'
+            app.config['DATABASE_TYPE'] = 'sqlite'
+            app.config['DATABASE'] = os.path.join(app.instance_path, 'trustmebro.db')
+    
+    # Now check the actual db_type (may have been changed above)
+    if db_type == 'postgresql':
         conn = psycopg2.connect(
             host=app.config['DB_HOST'],
             port=app.config['DB_PORT'],
