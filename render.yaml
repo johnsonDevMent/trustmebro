@@ -12,4 +12,6 @@ services:
       - key: TRUSTMEBRO_ADMIN_TOKEN
         generateValue: true
         sync: false
+      # Note: DATABASE_URL will be automatically set by Render when you link a PostgreSQL database
+      # To add a database: Create a PostgreSQL database in Render dashboard and link it to this service
 

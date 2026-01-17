@@ -13,6 +13,15 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_file, g
 from werkzeug.security import generate_password_hash, check_password_hash
+from urllib.parse import urlparse
+
+# Try to import PostgreSQL driver
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    PSYCOPG2_AVAILABLE = False
 
 from paper_generator import PaperGenerator
 from chart_generator import ChartGenerator
@@ -25,7 +34,24 @@ from pdf_generator import PDFGenerator
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
-    app.config['DATABASE'] = os.path.join(app.instance_path, 'trustmebro.db')
+    
+    # Database configuration - support both SQLite and PostgreSQL
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        # PostgreSQL via DATABASE_URL
+        app.config['DATABASE_URL'] = database_url
+        app.config['DATABASE_TYPE'] = 'postgresql'
+        # Parse DATABASE_URL to extract connection info
+        parsed = urlparse(database_url)
+        app.config['DB_HOST'] = parsed.hostname
+        app.config['DB_PORT'] = parsed.port or 5432
+        app.config['DB_NAME'] = parsed.path[1:]  # Remove leading /
+        app.config['DB_USER'] = parsed.username
+        app.config['DB_PASSWORD'] = parsed.password
+    else:
+        # SQLite fallback
+        app.config['DATABASE'] = os.path.join(app.instance_path, 'trustmebro.db')
+        app.config['DATABASE_TYPE'] = 'sqlite'
     
     # Detect production environment
     is_production = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER')
@@ -73,88 +99,197 @@ def check_rate_limit(key, max_requests=10, window_seconds=60):
 # DATABASE
 # =============================================================================
 
+class DatabaseWrapper:
+    """Wrapper to normalize SQLite and PostgreSQL interfaces"""
+    def __init__(self, conn, db_type):
+        self.conn = conn
+        self.db_type = db_type
+        if db_type == 'sqlite':
+            self.conn.row_factory = sqlite3.Row
+    
+    def execute(self, query, params=None):
+        """Execute query, converting ? to %s for PostgreSQL"""
+        if self.db_type == 'postgresql' and '?' in query:
+            query = query.replace('?', '%s')
+        
+        cursor = self.conn.cursor()
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        
+        # For PostgreSQL, convert result to dict-like rows
+        if self.db_type == 'postgresql':
+            cursor = self._make_dict_cursor(cursor)
+        
+        return cursor
+    
+    def _make_dict_cursor(self, cursor):
+        """Convert PostgreSQL cursor results to dict-like access"""
+        class DictCursor:
+            def __init__(self, cursor, conn):
+                self.cursor = cursor
+                self.conn = conn
+                self.description = cursor.description
+            
+            def fetchone(self):
+                row = self.cursor.fetchone()
+                if row is None:
+                    return None
+                return dict(zip([col[0] for col in self.description], row))
+            
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                if not rows:
+                    return []
+                return [dict(zip([col[0] for col in self.description], row)) for row in rows]
+            
+            def __getattr__(self, name):
+                return getattr(self.cursor, name)
+        
+        return DictCursor(cursor, self.conn)
+    
+    def commit(self):
+        """Commit transaction"""
+        self.conn.commit()
+    
+    def close(self):
+        """Close connection"""
+        self.conn.close()
+    
+    def __getattr__(self, name):
+        """Delegate other attributes to the connection"""
+        return getattr(self.conn, name)
+
 def get_db():
+    """Get database connection - supports both SQLite and PostgreSQL"""
     if 'db' not in g:
-        g.db = sqlite3.connect(current_app.config['DATABASE'])
-        g.db.row_factory = sqlite3.Row
+        db_type = current_app.config.get('DATABASE_TYPE', 'sqlite')
+        
+        if db_type == 'postgresql':
+            if not PSYCOPG2_AVAILABLE:
+                raise RuntimeError("PostgreSQL support requires psycopg2-binary. Install it with: pip install psycopg2-binary")
+            
+            # PostgreSQL connection
+            raw_conn = psycopg2.connect(
+                host=current_app.config['DB_HOST'],
+                port=current_app.config['DB_PORT'],
+                database=current_app.config['DB_NAME'],
+                user=current_app.config['DB_USER'],
+                password=current_app.config['DB_PASSWORD']
+            )
+            raw_conn.autocommit = False
+            g.db = DatabaseWrapper(raw_conn, 'postgresql')
+        else:
+            # SQLite connection
+            raw_conn = sqlite3.connect(current_app.config['DATABASE'])
+            g.db = DatabaseWrapper(raw_conn, 'sqlite')
     return g.db
 
 def close_db(e=None):
+    """Close database connection"""
     db = g.pop('db', None)
     if db is not None:
         db.close()
 
 def init_db(app):
-    """Initialize database with all tables"""
-    db_path = app.config['DATABASE']
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    """Initialize database with all tables - supports both SQLite and PostgreSQL"""
+    db_type = app.config.get('DATABASE_TYPE', 'sqlite')
+    
+    if db_type == 'postgresql':
+        if not PSYCOPG2_AVAILABLE:
+            raise RuntimeError("PostgreSQL support requires psycopg2-binary. Install it with: pip install psycopg2-binary")
+        
+        conn = psycopg2.connect(
+            host=app.config['DB_HOST'],
+            port=app.config['DB_PORT'],
+            database=app.config['DB_NAME'],
+            user=app.config['DB_USER'],
+            password=app.config['DB_PASSWORD']
+        )
+        cursor = conn.cursor()
+        
+        # PostgreSQL uses SERIAL instead of INTEGER PRIMARY KEY AUTOINCREMENT
+        id_type = "SERIAL PRIMARY KEY"
+        int_type = "INTEGER"
+        text_type = "TEXT"
+        timestamp_default = "DEFAULT CURRENT_TIMESTAMP"
+    else:
+        # SQLite
+        db_path = app.config['DATABASE']
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        id_type = "INTEGER PRIMARY KEY AUTOINCREMENT"
+        int_type = "INTEGER"
+        text_type = "TEXT"
+        timestamp_default = "DEFAULT CURRENT_TIMESTAMP"
     
     # Users table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_admin INTEGER DEFAULT 0,
-            is_banned INTEGER DEFAULT 0
+            id {id_type},
+            username {text_type} UNIQUE NOT NULL,
+            password_hash {text_type} NOT NULL,
+            created_at TIMESTAMP {timestamp_default},
+            is_admin {int_type} DEFAULT 0,
+            is_banned {int_type} DEFAULT 0
         )
     ''')
     
     # Papers table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS papers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            paper_id TEXT UNIQUE NOT NULL,
-            fingerprint TEXT UNIQUE NOT NULL,
-            claim TEXT NOT NULL,
-            template TEXT NOT NULL,
-            length TEXT NOT NULL,
-            voice TEXT NOT NULL,
-            tone TEXT NOT NULL,
-            chart_count INTEGER NOT NULL,
-            lock_seed INTEGER DEFAULT 0,
-            title TEXT NOT NULL,
-            authors TEXT NOT NULL,
-            affiliations TEXT NOT NULL,
-            abstract TEXT NOT NULL,
-            introduction TEXT,
-            methods TEXT,
-            results TEXT,
-            discussion TEXT,
-            limitations TEXT NOT NULL,
-            references_json TEXT NOT NULL,
-            chart_data_json TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            user_id INTEGER,
+            id {id_type},
+            paper_id {text_type} UNIQUE NOT NULL,
+            fingerprint {text_type} UNIQUE NOT NULL,
+            claim {text_type} NOT NULL,
+            template {text_type} NOT NULL,
+            length {text_type} NOT NULL,
+            voice {text_type} NOT NULL,
+            tone {text_type} NOT NULL,
+            chart_count {int_type} NOT NULL,
+            lock_seed {int_type} DEFAULT 0,
+            title {text_type} NOT NULL,
+            authors {text_type} NOT NULL,
+            affiliations {text_type} NOT NULL,
+            abstract {text_type} NOT NULL,
+            introduction {text_type},
+            methods {text_type},
+            results {text_type},
+            discussion {text_type},
+            limitations {text_type} NOT NULL,
+            references_json {text_type} NOT NULL,
+            chart_data_json {text_type} NOT NULL,
+            created_at TIMESTAMP {timestamp_default},
+            user_id {int_type},
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
     
     # Share tokens table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS share_tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            token TEXT UNIQUE NOT NULL,
-            paper_id TEXT NOT NULL,
+            id {id_type},
+            token {text_type} UNIQUE NOT NULL,
+            paper_id {text_type} NOT NULL,
             expires_at TIMESTAMP NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP {timestamp_default},
             FOREIGN KEY (paper_id) REFERENCES papers(paper_id)
         )
     ''')
     
     # Gallery posts table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS gallery_posts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            post_id TEXT UNIQUE NOT NULL,
-            paper_id TEXT NOT NULL,
-            user_id INTEGER NOT NULL,
-            vote_count INTEGER DEFAULT 0,
-            is_hidden INTEGER DEFAULT 0,
-            is_deleted INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            id {id_type},
+            post_id {text_type} UNIQUE NOT NULL,
+            paper_id {text_type} NOT NULL,
+            user_id {int_type} NOT NULL,
+            vote_count {int_type} DEFAULT 0,
+            is_hidden {int_type} DEFAULT 0,
+            is_deleted {int_type} DEFAULT 0,
+            created_at TIMESTAMP {timestamp_default},
             deleted_at TIMESTAMP,
             FOREIGN KEY (paper_id) REFERENCES papers(paper_id),
             FOREIGN KEY (user_id) REFERENCES users(id)
@@ -162,13 +297,13 @@ def init_db(app):
     ''')
     
     # Votes table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS votes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            post_id TEXT NOT NULL,
-            user_id INTEGER NOT NULL,
-            vote_value INTEGER NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            id {id_type},
+            post_id {text_type} NOT NULL,
+            user_id {int_type} NOT NULL,
+            vote_value {int_type} NOT NULL,
+            created_at TIMESTAMP {timestamp_default},
             UNIQUE(post_id, user_id),
             FOREIGN KEY (post_id) REFERENCES gallery_posts(post_id),
             FOREIGN KEY (user_id) REFERENCES users(id)
@@ -176,17 +311,17 @@ def init_db(app):
     ''')
     
     # Reports table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS reports (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            post_id TEXT NOT NULL,
-            user_id INTEGER,
-            reason TEXT NOT NULL,
-            notes TEXT,
-            status TEXT DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            id {id_type},
+            post_id {text_type} NOT NULL,
+            user_id {int_type},
+            reason {text_type} NOT NULL,
+            notes {text_type},
+            status {text_type} DEFAULT 'pending',
+            created_at TIMESTAMP {timestamp_default},
             reviewed_at TIMESTAMP,
-            reviewed_by INTEGER,
+            reviewed_by {int_type},
             FOREIGN KEY (post_id) REFERENCES gallery_posts(post_id),
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (reviewed_by) REFERENCES users(id)
@@ -194,26 +329,26 @@ def init_db(app):
     ''')
     
     # Moderation log table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS moderation_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            action TEXT NOT NULL,
-            target_type TEXT NOT NULL,
-            target_id TEXT NOT NULL,
-            admin_id INTEGER NOT NULL,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            id {id_type},
+            action {text_type} NOT NULL,
+            target_type {text_type} NOT NULL,
+            target_id {text_type} NOT NULL,
+            admin_id {int_type} NOT NULL,
+            notes {text_type},
+            created_at TIMESTAMP {timestamp_default},
             FOREIGN KEY (admin_id) REFERENCES users(id)
         )
     ''')
     
     # Blocked keywords table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS blocked_keywords (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            keyword TEXT UNIQUE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            created_by INTEGER,
+            id {id_type},
+            keyword {text_type} UNIQUE NOT NULL,
+            created_at TIMESTAMP {timestamp_default},
+            created_by {int_type},
             FOREIGN KEY (created_by) REFERENCES users(id)
         )
     ''')
@@ -221,7 +356,12 @@ def init_db(app):
     # Insert default blocked keywords
     default_keywords = ['hate', 'kill', 'murder', 'terrorist', 'bomb']
     for kw in default_keywords:
-        cursor.execute('INSERT OR IGNORE INTO blocked_keywords (keyword) VALUES (?)', (kw,))
+        if db_type == 'postgresql':
+            # PostgreSQL uses ON CONFLICT
+            cursor.execute('INSERT INTO blocked_keywords (keyword) VALUES (%s) ON CONFLICT (keyword) DO NOTHING', (kw,))
+        else:
+            # SQLite uses INSERT OR IGNORE
+            cursor.execute('INSERT OR IGNORE INTO blocked_keywords (keyword) VALUES (?)', (kw,))
     
     conn.commit()
     conn.close()
@@ -233,11 +373,27 @@ def init_db(app):
 from flask import current_app
 
 def get_database():
-    """Get database connection"""
-    if 'db' not in g:
-        g.db = sqlite3.connect(current_app.config['DATABASE'])
-        g.db.row_factory = sqlite3.Row
-    return g.db
+    """Get database connection - alias for get_db() for compatibility"""
+    return get_db()
+
+def get_param_placeholder():
+    """Get the correct parameter placeholder for the current database type"""
+    db_type = current_app.config.get('DATABASE_TYPE', 'sqlite')
+    return '%s' if db_type == 'postgresql' else '?'
+
+def execute_query(cursor, query, params=None):
+    """Execute a query with proper parameter placeholders for the database type"""
+    db_type = current_app.config.get('DATABASE_TYPE', 'sqlite')
+    
+    # Convert ? placeholders to %s for PostgreSQL if needed
+    if db_type == 'postgresql' and '?' in query:
+        query = query.replace('?', '%s')
+    
+    if params:
+        cursor.execute(query, params)
+    else:
+        cursor.execute(query)
+    return cursor
 
 def login_required(f):
     """Decorator for routes that require login"""
