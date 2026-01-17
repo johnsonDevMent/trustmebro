@@ -27,8 +27,11 @@ def create_app():
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
     app.config['DATABASE'] = os.path.join(app.instance_path, 'trustmebro.db')
     
+    # Detect production environment
+    is_production = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER')
+    
     # Security settings
-    app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+    app.config['SESSION_COOKIE_SECURE'] = is_production  # True in production with HTTPS
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
